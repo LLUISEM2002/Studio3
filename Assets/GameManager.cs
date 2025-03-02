@@ -7,9 +7,13 @@ public class GameManager : MonoBehaviour
     public static GameManager Instance;
 
     public TMP_Text scoreText; // Reference to the score text
-    private int score = 0;
+    public Slider dashCooldownSlider; // Reference to the dash cooldown UI
 
-// a failsafe to ensure that only one instance of GameManager exists in the scene
+    private int score = 0;
+    private float lastDashTime = -999f; // Tracks last dash time
+    private float dashCooldown = 1f;    // Default cooldown value
+
+    // a failsafe to ensure that only one instance of GameManager exists in the scene
     private void Awake()
     {
         // Ensure there's only one instance of GameManager
@@ -23,6 +27,11 @@ public class GameManager : MonoBehaviour
         }
     }
 
+    private void Update()
+    {
+        UpdateDashCooldownUI();
+    }
+
     public void AddScore(int amount)
     {
         score += amount; // Increase score
@@ -33,5 +42,19 @@ public class GameManager : MonoBehaviour
     {
         scoreText.text = "Score: " + score.ToString();
     }
-}
 
+    public void StartDashCooldown(float cooldownDuration)
+    {
+        dashCooldown = cooldownDuration;
+        lastDashTime = Time.time; // Set last dash time
+    }
+
+    private void UpdateDashCooldownUI()
+    {
+        if (dashCooldownSlider != null)
+        {
+            float cooldownProgress = Mathf.Clamp01((Time.time - lastDashTime) / dashCooldown);
+            dashCooldownSlider.value = cooldownProgress;
+        }
+    }
+}

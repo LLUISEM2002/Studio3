@@ -8,6 +8,7 @@ public class InputManager : MonoBehaviour
     private bool jumpPressed;
     private bool jumpHeld;
     private bool jumpReleased;
+    private bool dashPressed;
 
     private void Awake()
     {
@@ -31,6 +32,9 @@ public class InputManager : MonoBehaviour
         jumpPressed = Input.GetButtonDown("Jump");
         jumpHeld = Input.GetButton("Jump");
         jumpReleased = Input.GetButtonUp("Jump");
+
+        // Dash input detection
+        dashPressed = Input.GetKeyDown(KeyCode.LeftShift);
     }
 
     public Vector2 GetMoveInput()
@@ -51,5 +55,10 @@ public class InputManager : MonoBehaviour
     public bool IsJumpReleased()
     {
         return jumpReleased;
+    }
+
+    public bool IsDashPressed()
+    {
+        return dashPressed;
     }
 }

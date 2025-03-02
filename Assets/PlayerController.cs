@@ -4,25 +4,33 @@ using UnityEngine;
 public class PlayerController : MonoBehaviour
 {
     public float moveSpeed = 5f;
-    public float jumpForce = 8f;         // Initial jump force
-    public float maxJumpTime = 0.3f;     // Max time jump can be sustained
-    public float jumpHoldForce = 5f;     // Extra force while holding jump
-    public float jumpHoldTime = 0f;      // Time jump has been held for debugging
-    public float rotationSpeed = 10f;    // Rotation speed
-    public float doubleJumpForce = 8f;   // Fixed force for double jump
+    public float jumpForce = 8f;
+    public float maxJumpTime = 0.3f;
+    public float jumpHoldForce = 5f;
+    public float jumpHoldTime = 0f;
+    public float rotationSpeed = 10f;
+    public float doubleJumpForce = 8f;
+
+    // Dash variables
+    public float dashSpeed = 20f;
+    public float dashDuration = 0.2f;
+    public float dashCooldown = 1f;
 
     private Rigidbody rb;
     private bool isGrounded;
     private bool canDoubleJump;
     private bool isJumping;
-    private bool jumpReleasedAfterFirstJump; // Ensures double jump can only happen after releasing jump
+    private bool jumpReleasedAfterFirstJump;
+    private bool isDashing;
+    private float dashTimeRemaining;
+    private float lastDashTime;
 
-    private Transform cameraTransform;   // Reference to the camera's transform
+    private Transform cameraTransform;
 
     private void Start()
     {
         rb = GetComponent<Rigidbody>();
-        rb.freezeRotation = true; // Prevents unwanted rotations
+        rb.freezeRotation = true;
         cameraTransform = Camera.main.transform;
 
         // Locks the cursor to the center of the screen and hides it for aesthetic purposes
@@ -32,13 +40,24 @@ public class PlayerController : MonoBehaviour
 
     private void Update()
     {
-        // Get movement input from InputManager
+        // Get movement input
         Vector2 input = InputManager.Instance.GetMoveInput();
-
-        // Convert input into world space movement relative to the camera
         Vector3 moveDirection = CameraRelativeMovement(input);
-        
-        // Apply movement while keeping Y velocity unchanged
+
+        // Check if dash is activated
+        if (InputManager.Instance.IsDashPressed() && Time.time > lastDashTime + dashCooldown && !isDashing)
+        {
+            StartDash(moveDirection);
+        }
+
+        // Handle dashing movement
+        if (isDashing)
+        {
+            DashMovement();
+            return; // Prevents normal movement & jumping while dashing
+        }
+
+        // Apply normal movement
         rb.linearVelocity = new Vector3(moveDirection.x * moveSpeed, rb.linearVelocity.y, moveDirection.z * moveSpeed);
 
         // Rotate player towards movement direction
@@ -48,11 +67,11 @@ public class PlayerController : MonoBehaviour
             transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, rotationSpeed * Time.deltaTime);
         }
 
-        // Jumping Logic
+        // Jump logic
         if (isGrounded && InputManager.Instance.IsJumpPressed())
         {
             isJumping = true;
-            jumpReleasedAfterFirstJump = false; // Reset jump release tracker
+            jumpReleasedAfterFirstJump = false;
             jumpHoldTime = 0f;
             rb.linearVelocity = new Vector3(rb.linearVelocity.x, jumpForce, rb.linearVelocity.z);
         }
@@ -68,21 +87,53 @@ public class PlayerController : MonoBehaviour
         if (InputManager.Instance.IsJumpReleased() || jumpHoldTime >= maxJumpTime)
         {
             isJumping = false;
-            jumpReleasedAfterFirstJump = true; // Allow double jump once jump is released
+            jumpReleasedAfterFirstJump = true;
         }
 
         // Double Jump Logic
         if (!isGrounded && canDoubleJump && jumpReleasedAfterFirstJump && InputManager.Instance.IsJumpPressed())
         {
             rb.linearVelocity = new Vector3(rb.linearVelocity.x, doubleJumpForce, rb.linearVelocity.z);
-            canDoubleJump = false; // Disable further double jumps
+            canDoubleJump = false;
+        }
+    }
+
+    private void StartDash(Vector3 moveDirection)
+    {
+        if (moveDirection == Vector3.zero) return; // Prevent dashing with no input
+
+        isDashing = true;
+        dashTimeRemaining = dashDuration;
+        lastDashTime = Time.time;
+
+        moveDirection.y = 0; // So that the dash is only horizontal
+
+        // Disable gravity and freeze Y velocity to prevent falling
+        rb.useGravity = false;   
+        rb.linearVelocity = moveDirection.normalized * dashSpeed;
+
+        // Notify GameManager to update the UI cooldown
+        GameManager.Instance.StartDashCooldown(dashCooldown);
+    }
+
+    private void DashMovement()
+    {
+        dashTimeRemaining -= Time.deltaTime;
+
+        // Keep velocity strictly horizontal during dash
+        rb.linearVelocity = new Vector3(rb.linearVelocity.x, 0, rb.linearVelocity.z);
+
+        if (dashTimeRemaining <= 0)
+        {
+            isDashing = false;
+            rb.useGravity = true; // Re-enable gravity after dash ends
         }
     }
 
     private void OnCollisionStay(Collision collision)
     {
         isGrounded = true;
-        canDoubleJump = true; // Reset double jump when touching the ground
+        canDoubleJump = true;
     }
 
     private void OnCollisionExit(Collision collision)
@@ -98,14 +149,12 @@ public class PlayerController : MonoBehaviour
         Vector3 forward = cameraTransform.forward;
         Vector3 right = cameraTransform.right;
 
-        // Flatten the forward and right vectors to remove vertical influence
         forward.y = 0;
         right.y = 0;
-        
+
         forward.Normalize();
         right.Normalize();
 
-        // Combine the forward and right vectors with input
         return forward * input.y + right * input.x;
     }
 }
