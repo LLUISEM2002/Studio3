@@ -9,11 +9,14 @@ public class PlayerController : MonoBehaviour
     public float jumpHoldForce = 5f;     // Extra force while holding jump
     public float jumpHoldTime = 0f;      // Time jump has been held for debugging
     public float rotationSpeed = 10f;    // Rotation speed
-
+    public float doubleJumpForce = 8f;   // Fixed force for double jump
 
     private Rigidbody rb;
     private bool isGrounded;
+    private bool canDoubleJump;
     private bool isJumping;
+    private bool jumpReleasedAfterFirstJump; // Ensures double jump can only happen after releasing jump
+
     private Transform cameraTransform;   // Reference to the camera's transform
 
     private void Start()
@@ -49,6 +52,7 @@ public class PlayerController : MonoBehaviour
         if (isGrounded && InputManager.Instance.IsJumpPressed())
         {
             isJumping = true;
+            jumpReleasedAfterFirstJump = false; // Reset jump release tracker
             jumpHoldTime = 0f;
             rb.linearVelocity = new Vector3(rb.linearVelocity.x, jumpForce, rb.linearVelocity.z);
         }
@@ -64,12 +68,21 @@ public class PlayerController : MonoBehaviour
         if (InputManager.Instance.IsJumpReleased() || jumpHoldTime >= maxJumpTime)
         {
             isJumping = false;
+            jumpReleasedAfterFirstJump = true; // Allow double jump once jump is released
+        }
+
+        // Double Jump Logic
+        if (!isGrounded && canDoubleJump && jumpReleasedAfterFirstJump && InputManager.Instance.IsJumpPressed())
+        {
+            rb.linearVelocity = new Vector3(rb.linearVelocity.x, doubleJumpForce, rb.linearVelocity.z);
+            canDoubleJump = false; // Disable further double jumps
         }
     }
 
     private void OnCollisionStay(Collision collision)
     {
         isGrounded = true;
+        canDoubleJump = true; // Reset double jump when touching the ground
     }
 
     private void OnCollisionExit(Collision collision)
